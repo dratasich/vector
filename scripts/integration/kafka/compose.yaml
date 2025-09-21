@@ -1,35 +1,38 @@
 version: '3'
 
 services:
-  zookeeper:
-    image: docker.io/confluentinc/cp-zookeeper:${CONFIG_VERSION}
-    ports:
-    - 2181:2181
-    environment:
-    - ZOOKEEPER_CLIENT_PORT=2181
   kafka:
-    image: docker.io/confluentinc/cp-kafka:7.6.1
-    depends_on:
-    - zookeeper
+    # using vanilla kafka image
+    # (kafka-native has some troubles with jaas config: KAFKA-19584)
+    image: docker.io/apache/kafka:${CONFIG_VERSION}
+    # kafka in KRaft mode
+    # single node setup -> set topic replication factor to 1 (default is 3)
+    #
+    # see kafka docker configure script for details what variables are required:
+    # https://github.com/apache/kafka/blob/trunk/docker/resources/common-scripts/configure
     environment:
-    - KAFKA_BROKER_ID=1
-    - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
-    - ZOOKEEPER_SASL_ENABLED=false
+    - KAFKA_PROCESS_ROLES=broker,controller
+    - KAFKA_NODE_ID=1
+    - KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9099
+    - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+    - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+    - CLUSTER_ID=NdjtTIuPko9ZxDUQV9zXd4kmXgC9HFug
     - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
-    - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
-    - KAFKA_LISTENERS=PLAINTEXT://:9091,SSL://:9092,SASL_PLAINTEXT://:9093
+    - KAFKA_LISTENERS=PLAINTEXT://:9091,SSL://:9092,SASL_PLAINTEXT://:9093,CONTROLLER://:9099
     - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9091,SSL://kafka:9092,SASL_PLAINTEXT://kafka:9093
+    - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,SSL:SSL
+    - KAFKA_SASL_ENABLED_MECHANISMS=PLAIN
+    - KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL=PLAIN
+    - KAFKA_OPTS=-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf
     - KAFKA_SSL_KEYSTORE_TYPE=PKCS12
     - KAFKA_SSL_KEY_CREDENTIALS=kafka.pass
     - KAFKA_SSL_KEYSTORE_CREDENTIALS=kafka.pass
     - KAFKA_SSL_KEYSTORE_FILENAME=kafka.p12
     - KAFKA_SSL_CLIENT_AUTH=none
-    - KAFKA_OPTS=-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf
-    - KAFKA_SASL_ENABLED_MECHANISMS=PLAIN
     ports:
-    - 9091:9091
-    - 9092:9092
-    - 9093:9093
+    - 9091:9091  # PLAINTEXT (no TLS/SSL)
+    - 9092:9092  # SASL/PLAIN (username/password with TLS/SSL)
+    - 9093:9093  # SASL_PLAINTEXT
     volumes:
     - ../../../tests/data/ca/intermediate_server/private/kafka.pass:/etc/kafka/secrets/kafka.pass:ro
     - ../../../tests/data/ca/intermediate_server/private/kafka.p12:/etc/kafka/secrets/kafka.p12:ro

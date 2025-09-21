@@ -7,7 +7,9 @@ env:
   KAFKA_HOST: kafka
 
 matrix:
-  version: [latest]
+  version:
+  - "3.9.1"
+  - "4.1.0"
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
